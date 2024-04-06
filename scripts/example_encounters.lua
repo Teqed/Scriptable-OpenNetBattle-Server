@@ -3,8 +3,8 @@ local Encounters = require("scripts/libs/encounters")
 -- Setup the default area's encounters
 local encounters_table = { }
 encounters_table["default"] = {
-  min_travel = 2, -- 2 tiles are free to walk after each encounter
-  chance = .05, -- 5% chance for each movement event after the minimum travel to cause an encounter
+  min_travel = 20, -- 2 tiles are free to walk after each encounter
+  chance = .0005, -- 0.05% chance for each movement event after the minimum travel to cause an encounter
   preload = true,
   encounters = {
     {

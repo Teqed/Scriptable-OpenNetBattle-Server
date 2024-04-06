@@ -18,6 +18,8 @@ local bot_id = Net.create_bot({
 local mug_texture_path = "resources/ow/prog/prog_mug.png"
 local mug_animation_path = "resources/ow/prog/prog_mug.animation"
 
+Net.set_bot_direction(bot_id, Direction.DOWN)
+
 Net:on("actor_interaction", function(event)
   local player_id = event.player_id
 
@@ -27,19 +29,23 @@ Net:on("actor_interaction", function(event)
 
   Net.set_bot_direction(bot_id, Direction.from_points(bot_pos, player_pos))
 
-  Async.question_player(player_id, "HELLO! ARE YOU DOING WELL TODAY?", mug_texture_path, mug_animation_path)
-    .and_then(function(response)
-      if response == nil then
-        -- player disconnected
-        return
-      end
+  Net.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path);
+  Net.unlock_player_input(player_id)
+  Net.set_bot_direction(bot_id, Direction.DOWN)
 
-      if response == 1 then
-        Net.message_player(player_id, "THAT'S GREAT!", mug_texture_path, mug_animation_path);
-      else
-        Net.message_player(player_id, "OH NO! I HOPE YOUR DAY GETS BETTER.", mug_texture_path, mug_animation_path);
-      end
+  -- Async.question_player(player_id, "HELLO! ARE YOU DOING WELL TODAY?", mug_texture_path, mug_animation_path)
+  --   .and_then(function(response)
+  --     if response == nil then
+  --       -- player disconnected
+  --       return
+  --     end
 
-      Net.unlock_player_input(player_id)
-  end)
+  --     if response == 1 then
+  --       Net.message_player(player_id, "THAT'S GREAT!", mug_texture_path, mug_animation_path);
+  --     else
+  --       Net.message_player(player_id, "OH NO! I HOPE YOUR DAY GETS BETTER.", mug_texture_path, mug_animation_path);
+  --     end
+
+  --     Net.unlock_player_input(player_id)
+  -- end)
 end)

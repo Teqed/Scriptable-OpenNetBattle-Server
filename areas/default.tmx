@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.6" orientation="isometric" renderorder="right-down" compressionlevel="0" width="10" height="11" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="54">
+<map version="1.8" tiledversion="1.8.6" orientation="isometric" renderorder="right-down" compressionlevel="0" width="10" height="11" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="57">
  <properties>
   <property name="Background" value="secret"/>
   <property name="Name" value="Teq's_Index"/>
   <property name="Song" value="resources/loops/loop_overworld.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/floor.tsx"/>
- <tileset firstgid="4" source="../assets/tiles/warp.tsx"/>
- <tileset firstgid="10" source="../assets/tiles/hp_warp.tsx"/>
- <tileset firstgid="15" source="../assets/tiles/home_warp.tsx"/>
- <tileset firstgid="20" source="../assets/tiles/tree.tsx"/>
- <tileset firstgid="24" source="../assets/tiles/coffee.tsx"/>
- <tileset firstgid="28" source="../assets/tiles/gate.tsx"/>
- <tileset firstgid="33" source="../assets/tiles/cloud.tsx"/>
+ <tileset firstgid="5" source="../assets/tiles/warp.tsx"/>
+ <tileset firstgid="11" source="../assets/tiles/hp_warp.tsx"/>
+ <tileset firstgid="16" source="../assets/tiles/home_warp.tsx"/>
+ <tileset firstgid="21" source="../assets/tiles/tree.tsx"/>
+ <tileset firstgid="25" source="../assets/tiles/coffee.tsx"/>
+ <tileset firstgid="29" source="../assets/tiles/gate.tsx"/>
+ <tileset firstgid="34" source="../assets/tiles/cloud.tsx"/>
  <layer id="1" name="Floor" width="10" height="11">
   <data encoding="csv">
 2,2,2,0,0,0,0,0,0,0,
-2,5,2,1,1,1,0,0,0,0,
-2,2,2,1,1,1,2,2,2,0,
-0,1,1,1,2147483649,1,2,2,2,0,
-0,2147483649,1,1,1,1,2,2,2,0,
-0,1,2147483649,1,2147483649,1,1,0,2147483687,0,
-0,0,0,1,1,1,0,38,37,2147483689,
-0,33,0,0,0,0,0,39,36,44,
-0,0,0,0,0,0,0,38,36,43,
-0,0,0,0,0,0,0,0,41,0,
+2,6,2,1,1,1,0,0,0,0,
+2,2,2,1,1,1,0,2,2,2,
+0,1,1,1,2147483649,1,2,2,2,2,
+0,2147483649,1,1,1,1,0,2,2,2,
+0,1,2147483649,1,2147483649,1,1,4,2147483688,0,
+0,0,0,1,1,1,0,39,38,2147483690,
+0,34,0,0,0,0,0,40,37,45,
+0,0,0,0,0,0,0,39,37,44,
+0,0,0,0,0,0,0,0,42,0,
 0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
  <objectgroup id="5" name="Object Layer">
-  <object id="18" gid="24" x="106.75" y="75.25" width="33" height="54"/>
+  <object id="18" gid="25" x="115" y="74" width="33" height="54"/>
   <object id="44" name="Bot Spawn" x="145.75" y="51.25">
    <point/>
   </object>
-  <object id="46" type="Home Warp" gid="15" x="128.25" y="128.75" width="60" height="32"/>
-  <object id="51" name="To Net" type="Server Warp" gid="5" x="31" y="32.5" width="61" height="32">
+  <object id="46" type="Home Warp" gid="16" x="128.25" y="128.75" width="60" height="32"/>
+  <object id="51" name="To Net" type="Server Warp" gid="6" x="31" y="32.5" width="61" height="32">
    <properties>
     <property name="Activation Radius" value="0.9"/>
     <property name="Address" value="keristero.xyz"/>
@@ -43,7 +43,7 @@
     <property name="Warp Out" value="true"/>
    </properties>
   </object>
-  <object id="53" name="To Net" type="Server Warp" gid="5" x="223.5" y="96" width="61" height="32">
+  <object id="53" name="To Debug" type="Server Warp" gid="6" x="256" y="96" width="61" height="32">
    <properties>
     <property name="Activation Radius" value="0.9"/>
     <property name="Address" value="netbattle.shatteredsky.net"/>
@@ -52,5 +52,6 @@
     <property name="Warp Out" value="true"/>
    </properties>
   </object>
+  <object id="56" gid="2147483677" x="208.5" y="113.5" width="34" height="52"/>
  </objectgroup>
 </map>

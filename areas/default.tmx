@@ -16,7 +16,7 @@
  <layer id="1" name="Floor" width="10" height="11">
   <data encoding="csv">
 2,2,2,0,0,0,0,0,0,0,
-2,5,2,0,0,0,0,0,0,0,
+2,5,2,1,1,1,0,0,0,0,
 2,2,2,1,1,1,2,2,2,0,
 0,1,1,1,2147483649,1,2,2,2,0,
 0,2147483649,1,1,1,1,2,2,2,0,
@@ -29,8 +29,8 @@
 </data>
  </layer>
  <objectgroup id="5" name="Object Layer">
-  <object id="18" gid="24" x="132" y="212" width="33" height="54"/>
-  <object id="44" name="Bot Spawn" x="145.75" y="83.25">
+  <object id="18" gid="24" x="106.75" y="75.25" width="33" height="54"/>
+  <object id="44" name="Bot Spawn" x="145.75" y="51.25">
    <point/>
   </object>
   <object id="46" type="Home Warp" gid="15" x="128.25" y="128.75" width="60" height="32"/>

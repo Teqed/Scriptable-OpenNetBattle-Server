@@ -879,7 +879,7 @@ checksum = "816df386e5557ac1843a96f1ba8a7cbf4ab175d05ccc15c87a3cda27b4fbdece"
 
 [[package]]
 name = "net_battle_server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-std",
  "base64",

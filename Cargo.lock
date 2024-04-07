@@ -1011,6 +1011,7 @@ dependencies = [
  "byteorder",
  "clap",
  "closure",
+ "flate2",
  "fs_extra",
  "futures",
  "isahc",

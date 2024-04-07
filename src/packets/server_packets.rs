@@ -39,7 +39,10 @@ enum ServerPacketId {
   ShakeCamera,
   FadeCamera,
   TrackWithCamera,
+  EnableCameraControls,
   UnlockCamera,
+  EnableCameraZoom,
+  DisableCameraZoom,
   LockInput,
   UnlockInput,
   Teleport,
@@ -55,8 +58,10 @@ enum ServerPacketId {
   CloseBBS,
   ShopInventory,
   OpenShop,
+  OfferPackage,
   LoadPackage,
   ModWhitelist,
+  ModBlacklist,
   InitiateEncounter,
   InitiatePvp,
   ActorConnected,
@@ -68,7 +73,9 @@ enum ServerPacketId {
   ActorAnimate,
   ActorPropertyKeyFrames,
   ActorMinimapColor,
-  OfferPackage,
+  SynchronizeUpdates,
+  EndSynchronization,
+  TerminalResponse,
 }
 
 #[derive(Debug)]
@@ -185,7 +192,13 @@ pub enum ServerPacket<'a> {
   TrackWithCamera {
     actor_id: Option<&'a str>,
   },
+  EnableCameraControls {
+    dist_x: f32,
+    dist_y: f32,
+  },
   UnlockCamera,
+  EnableCameraZoom,
+  DisableCameraZoom,
   LockInput,
   UnlockInput,
   Teleport {
@@ -217,23 +230,20 @@ pub enum ServerPacket<'a> {
     default_text: Option<&'a str>,
   },
   OpenBoard {
-    current_depth: u8,
     name: &'a str,
     color: (u8, u8, u8),
     posts: &'a [BbsPost],
+    open_instantly: bool,
   },
   PrependPosts {
-    current_depth: u8,
     reference: Option<&'a str>,
     posts: &'a [BbsPost],
   },
   AppendPosts {
-    current_depth: u8,
     reference: Option<&'a str>,
     posts: &'a [BbsPost],
   },
   RemovePost {
-    current_depth: u8,
     id: &'a str,
   },
   PostSelectionAck,
@@ -254,7 +264,10 @@ pub enum ServerPacket<'a> {
     package_category: PackageCategory,
   },
   ModWhitelist {
-    whitelist_path: &'a str,
+    whitelist_path: Option<&'a str>,
+  },
+  ModBlacklist {
+    blacklist_path: Option<&'a str>,
   },
   InitiateEncounter {
     package_path: &'a str,
@@ -318,6 +331,11 @@ pub enum ServerPacket<'a> {
   ActorMinimapColor {
     ticket: &'a str,
     color: (u8, u8, u8, u8),
+  },
+  SynchronizeUpdates,
+  EndSynchronization,
+  TerminalResponse {
+    result_string: &'a str,
   },
 }
 
@@ -414,9 +432,10 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
 
       let data_type_byte = match asset.data {
         AssetData::Text(_) => 0,
-        AssetData::Texture(_) => 1,
-        AssetData::Audio(_) => 2,
-        AssetData::Data(_) => 3,
+        AssetData::CompressedText(_) => 1,
+        AssetData::Texture(_) => 2,
+        AssetData::Audio(_) => 3,
+        AssetData::Data(_) => 4,
       };
 
       buf.push(data_type_byte);
@@ -525,8 +544,19 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
         write_string_u16(buf, actor_id);
       }
     }
+    ServerPacket::EnableCameraControls { dist_x, dist_y } => {
+      write_u16(buf, ServerPacketId::EnableCameraControls as u16);
+      write_f32(buf, dist_x);
+      write_f32(buf, dist_y);
+    }
     ServerPacket::UnlockCamera => {
       write_u16(buf, ServerPacketId::UnlockCamera as u16);
+    }
+    ServerPacket::EnableCameraZoom => {
+      write_u16(buf, ServerPacketId::EnableCameraZoom as u16);
+    }
+    ServerPacket::DisableCameraZoom => {
+      write_u16(buf, ServerPacketId::DisableCameraZoom as u16);
     }
     ServerPacket::LockInput => {
       write_u16(buf, ServerPacketId::LockInput as u16);
@@ -594,17 +624,17 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
       }
     }
     ServerPacket::OpenBoard {
-      current_depth,
       name,
       color,
       posts,
+      open_instantly,
     } => {
       write_u16(buf, ServerPacketId::OpenBoard as u16);
-      buf.push(current_depth);
       write_string_u16(buf, name);
       buf.push(color.0);
       buf.push(color.1);
       buf.push(color.2);
+      write_bool(buf, open_instantly);
 
       write_u16(buf, posts.len() as u16);
 
@@ -615,13 +645,8 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
         write_string_u16(buf, &post.author);
       }
     }
-    ServerPacket::PrependPosts {
-      current_depth,
-      reference,
-      posts,
-    } => {
+    ServerPacket::PrependPosts { reference, posts } => {
       write_u16(buf, ServerPacketId::PrependPosts as u16);
-      buf.push(current_depth);
       write_bool(buf, reference.is_some());
 
       if reference.is_some() {
@@ -637,13 +662,8 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
         write_string_u16(buf, &post.author);
       }
     }
-    ServerPacket::AppendPosts {
-      current_depth,
-      reference,
-      posts,
-    } => {
+    ServerPacket::AppendPosts { reference, posts } => {
       write_u16(buf, ServerPacketId::AppendPosts as u16);
-      buf.push(current_depth);
       write_bool(buf, reference.is_some());
 
       if reference.is_some() {
@@ -659,9 +679,8 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
         write_string_u16(buf, &post.author);
       }
     }
-    ServerPacket::RemovePost { current_depth, id } => {
+    ServerPacket::RemovePost { id } => {
       write_u16(buf, ServerPacketId::RemovePost as u16);
-      buf.push(current_depth);
       write_string_u16(buf, id);
     }
     ServerPacket::PostSelectionAck => {
@@ -709,7 +728,11 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
     }
     ServerPacket::ModWhitelist { whitelist_path } => {
       write_u16(buf, ServerPacketId::ModWhitelist as u16);
-      write_string_u16(buf, whitelist_path);
+      write_string_u16(buf, whitelist_path.unwrap_or_default());
+    }
+    ServerPacket::ModBlacklist { blacklist_path } => {
+      write_u16(buf, ServerPacketId::ModBlacklist as u16);
+      write_string_u16(buf, blacklist_path.unwrap_or_default());
     }
     ServerPacket::InitiateEncounter {
       package_path,
@@ -865,6 +888,16 @@ pub fn build_packet(packet: ServerPacket) -> Vec<u8> {
       buf.push(b);
       buf.push(a);
     }
+    ServerPacket::SynchronizeUpdates => {
+      write_u16(buf, ServerPacketId::SynchronizeUpdates as u16);
+    }
+    ServerPacket::EndSynchronization => {
+      write_u16(buf, ServerPacketId::EndSynchronization as u16);
+    }
+    ServerPacket::TerminalResponse { result_string } => {
+      write_u16(buf, ServerPacketId::TerminalResponse as u16);
+      write_string_u16(buf, result_string);
+    }
   }
 
   vec
@@ -882,6 +915,7 @@ pub fn create_asset_stream<'a>(
 
   let mut bytes = match &asset.data {
     AssetData::Text(data) => data.as_bytes(),
+    AssetData::CompressedText(data) => data,
     AssetData::Texture(data) => data,
     AssetData::Audio(data) => data,
     AssetData::Data(data) => data,

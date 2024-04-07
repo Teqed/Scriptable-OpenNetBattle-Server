@@ -327,4 +327,18 @@ impl PluginInterface for PluginWrapper {
       plugin_interface.handle_server_message(net, socket_address, data)
     });
   }
+
+  fn handle_terminal_command(
+    &mut self,
+    net: &mut Net,
+    player_id: &str,
+    command_string: String,
+  ) -> Option<String> {
+    let mut response = None;
+    self.wrap_calls(net, |plugin_interface, net| {
+      response = plugin_interface.handle_terminal_command(net, player_id, command_string.clone())
+    });
+
+    response
+  }
 }

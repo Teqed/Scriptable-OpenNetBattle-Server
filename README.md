@@ -1,17 +1,36 @@
 # Scriptable server for [OpenNetBattle](https://github.com/TheMaverickProgrammer/OpenNetBattle).
 
-Scripts can be created through Lua. Entry scripts are read from `scripts/*/main.lua` for script projects, and `scripts/*.lua` for single file scripts.
+Scripting available through through Lua.
 
 Support for more sources such as WASM/WASI (C++, Kotlin, etc) or JavaScript can be added by creating a Plugin Interface. For an example of how implement one, take a look at the existing LuaPluginInterface.
 
 The Plugin Interface could also be used to build a Rust based script compiled directly into the server.
+
+## Minimal Setup
+
+- `areas` folder
+  - `.tmx` map files, `default.tmx` required
+  - See [Areas](#areas)
+- `assets` folder
+  - Tilesets, textures, audio, animations, packages
+  - See [Assets](#assets)
+- `scripts` folder
+  - Lua files. Entry scripts are read from `scripts/*/main.lua` for script projects, and `scripts/*.lua` for single file scripts
+  - See [Lua API](#lua-api)
+- Server executable
+  - See [Building the Project](#building-the-project) if you don't have a copy
+
+Run the server through a command prompt or terminal and join on `127.0.0.1:8765`
+
+Use `-h` to see more options and research port forwarding or server hosting if you want to share your server with others over the internet
 
 ## Assets
 
 Types of assets:
 
 - Texture (.png|.bmp)
-- Audio (.ogg)
+- Audio (.ogg|.wav|.mid|.midi)
+- Mod Packages (.zip)
 - Text
 
 Paths
@@ -33,6 +52,10 @@ Paths
 ## Areas
 
 Maps for areas are stored in `./areas`. The first area players will see is `default.tmx` (required).
+
+- [Suggested Settings](#suggested-settings)
+- [Custom Properties](#custom-properties)
+- [Object and Tile Types](#object-and-tile-types)
 
 ### Suggested Settings
 
@@ -141,7 +164,7 @@ Classes are used to denote special tiles or objects understood by the client.
     - Down Left
     - Down Right
 
-Position Warp:
+#### Position Warp
 
 - Tile Objects only
 - Visible in minimap
@@ -160,7 +183,7 @@ Position Warp:
     - Down Left
     - Down Right
 
-Server Warp:
+#### Server Warp
 
 - Tile Objects only
 - Visible in minimap
@@ -182,7 +205,7 @@ Server Warp:
     - Down Left
     - Down Right
 
-Custom Server Warp:
+#### Custom Server Warp
 
 - Tile Objects only
 - Visible in minimap
@@ -198,7 +221,7 @@ Custom Server Warp:
     - Down Left
     - Down Right
 
-Custom Warp:
+#### Custom Warp
 
 - Tile Objects only
 - Visible in minimap
@@ -213,17 +236,7 @@ Custom Warp:
     - Down Left
     - Down Right
 
-Board:
-
-- Tile Objects only
-- Visible in minimap
-
-Shop:
-
-- Tile Objects only
-- Visible in minimap
-
-Stairs:
+#### Stairs
 
 - Tiles only
 - Visible in minimap
@@ -238,7 +251,7 @@ Stairs:
     - Down Left
     - Down Right
 
-Conveyor:
+#### Conveyor
 
 - Tiles only
 - Visible in minimap
@@ -253,7 +266,7 @@ Conveyor:
   - Speed: number? (Tiles per second, default: 6)
   - Sound Effect: string
 
-Ice:
+#### Ice
 
 - Tiles only
 - Custom properties:
@@ -261,7 +274,7 @@ Ice:
   - Speed: number? (Tiles per second, default: 6)
   - Sound Effect: string
 
-Treadmill:
+#### Treadmill
 
 - Tiles only
 - Custom properties:
@@ -274,7 +287,17 @@ Treadmill:
     - Down Right
   - Speed: number? (Tiles per second, default: 1.875)
 
-Arrow:
+#### Board
+
+- Tile Objects only
+- Visible in minimap
+
+#### Shop
+
+- Tile Objects only
+- Visible in minimap
+
+#### Arrow
 
 - Tiles only
 - Visible in minimap
@@ -294,6 +317,19 @@ Arrow:
 ## Lua API
 
 Commented functions are in development and require changes to the client (specified below).
+
+- [Net Events](#net-events)
+- [Net API](#net-api)
+  - [Area API](#area-api)
+  - [Bot API](#bot-api)
+  - [Player API](#player-api)
+  - [Widget API](#widget-api)
+  - [Player Data API](#player-data-api)
+  - [Asset API](#asset-api)
+  - [Update Synchronization API](#update-synchronization-api)
+- [Async API](#async-api)
+- [Asyncified Net API](#asyncified-net-api)
+- [Event Emitters](#event-emitters)
 
 ### Net Events
 
@@ -575,18 +611,22 @@ Net.exclude_object_for_player(player_id, object_id)
 Net.include_object_for_player(player_id, object_id)
 Net.exclude_actor_for_player(player_id, actor_id)
 Net.include_actor_for_player(player_id, actor_id)
+Net.enable_camera_controls(player_id, range_x?, range_y?) -- range is in pixels
+Net.enable_camera_zoom(player_id)
+Net.disable_camera_zoom(player_id)
 Net.move_player_camera(player_id, x, y, z, holdTimeInSeconds?)
 Net.fade_player_camera(player_id, color, durationInSeconds) -- color = { r: 0-255, g: 0-255, b: 0-255, a?: 0-255 }
 Net.slide_player_camera(player_id, x, y, z, durationInSeconds)
 Net.shake_player_camera(player_id, strength, durationInSeconds)
 Net.track_with_player_camera(player_id, actor_id?)
-Net.is_player_input_locked(player_id)
 Net.unlock_player_camera(player_id)
+Net.is_player_input_locked(player_id)
 Net.lock_player_input(player_id)
 Net.unlock_player_input(player_id)
 Net.teleport_player(player_id, warp, x, y, z, direction?)
 Net.offer_package(player_id, package_path)
 Net.set_mod_whitelist_for_player(player_id, whitelist_path) -- whitelist has this format: `[md5] [package_id]\n`
+Net.set_mod_blacklist_for_player(player_id, blacklist_path) -- blacklist has this format: `[md5] [package_id]\n`
 Net.initiate_encounter(player_id, package_path, data?) -- data is a table, read as second param in package_build for the encounter package
 Net.initiate_pvp(player_1_id, player_2_id, field_script_path?)
 Net.transfer_player(player_id, area_id, warp_in?, x?, y?, z?, direction?)
@@ -607,7 +647,7 @@ Net.prompt_player(player_id, character_limit?, default_text?)
 
 -- color = { r: 0-255, g: 0-255, b: 0-255 }, posts = { id: string, read: bool?, title: string?, author: string? }[]
 -- returns EventEmitter, re-emits post_selection, post_request, board_close
-Net.open_board(player_id, board_name, color, posts)
+Net.open_board(player_id, board_name, color, posts, open_instantly?)
 Net.prepend_posts(player_id, posts, post_id?) -- unstable, issues arise when multiple scripts create boards at the same time
 Net.append_posts(player_id, posts, post_id?) -- unstable, issues arise when multiple scripts create boards at the same time
 Net.remove_post(player_id, post_id) -- unstable, issues arise when multiple scripts create boards at the same time
@@ -649,6 +689,18 @@ Net.remove_asset(server_path)
 Net.has_asset(server_path)
 Net.get_asset_type(server_path)
 Net.get_asset_size(server_path)
+```
+
+#### Update Synchronization API
+
+```Lua
+Net.synchronize(function()
+  -- Net updates here will wait to be processed on clients when every update is received
+end)
+
+-- automatically called by the above function, be careful when using these directly
+Net.request_update_synchronization()
+Net.request_disable_update_synchronization()
 ```
 
 ### Async API
@@ -714,6 +766,8 @@ emitter:destroy() -- allows async iterators to complete
 Windows requires for building lua [MSVC++](https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#visual-studio-2015-2017-2019-and-2022)
 
 This project is built with Rust, so after installing Cargo, you can compile and run the project with `cargo run`.
+
+For a standalone executable you can run `cargo build --release` and copy just the executable from `target/build`
 
 If you are interested in understanding the source before making changes, check out the [achitecture document](./ARCHITECTURE.md).
 

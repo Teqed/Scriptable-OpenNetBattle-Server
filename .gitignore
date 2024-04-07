@@ -4,3 +4,6 @@
 
 # for viewing maps with client side resources
 /tiles
+
+# ez- libs
+ezlibs-*/

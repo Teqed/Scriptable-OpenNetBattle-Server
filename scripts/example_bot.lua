@@ -2,10 +2,10 @@ local Direction = require("scripts/libs/direction")
 
 local area_id = "default"
 
-local bot_pos = Net.get_object_by_name(area_id, "Bot Spawn")
+local bot_pos = Net.get_object_by_name(area_id, "Welcome Bot")
 
 local bot_id = Net.create_bot({
-  name = "",
+  name = "Welcome Bot",
   area_id = area_id,
   texture_path = "/server/assets/prog.png",
   animation_path = "/server/assets/prog.animation",
@@ -18,9 +18,13 @@ local bot_id = Net.create_bot({
 local mug_texture_path = "resources/ow/prog/prog_mug.png"
 local mug_animation_path = "resources/ow/prog/prog_mug.animation"
 
-Net.set_bot_direction(bot_id, Direction.DOWN)
+Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
 
 Net:on("actor_interaction", function(event)
+  if event.actor_id ~= bot_id then
+      return
+  end
+
   local player_id = event.player_id
 
   Net.lock_player_input(player_id)
@@ -31,7 +35,7 @@ Net:on("actor_interaction", function(event)
 
   Net.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path);
   Net.unlock_player_input(player_id)
-  Net.set_bot_direction(bot_id, Direction.DOWN)
+  Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
 
   -- Async.question_player(player_id, "HELLO! ARE YOU DOING WELL TODAY?", mug_texture_path, mug_animation_path)
   --   .and_then(function(response)

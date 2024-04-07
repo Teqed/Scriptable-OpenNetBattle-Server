@@ -534,11 +534,38 @@ impl Net {
     );
   }
 
+  pub fn enable_camera_controls(&mut self, id: &str, dist_x: f32, dist_y: f32) {
+    self.packet_orchestrator.borrow_mut().send_by_id(
+      id,
+      Reliability::ReliableOrdered,
+      ServerPacket::EnableCameraControls {
+        dist_x: dist_x,
+        dist_y: dist_y,
+      },
+    )
+  }
+
   pub fn unlock_player_camera(&mut self, id: &str) {
     self.packet_orchestrator.borrow_mut().send_by_id(
       id,
       Reliability::ReliableOrdered,
       ServerPacket::UnlockCamera,
+    );
+  }
+
+  pub fn enable_camera_zoom(&mut self, id: &str) {
+    self.packet_orchestrator.borrow_mut().send_by_id(
+      id,
+      Reliability::ReliableOrdered,
+      ServerPacket::EnableCameraZoom,
+    );
+  }
+
+  pub fn disable_camera_zoom(&mut self, id: &str) {
+    self.packet_orchestrator.borrow_mut().send_by_id(
+      id,
+      Reliability::ReliableOrdered,
+      ServerPacket::DisableCameraZoom,
     );
   }
 
@@ -776,6 +803,7 @@ impl Net {
     name: &str,
     color: (u8, u8, u8),
     posts: Vec<BbsPost>,
+    open_instantly: bool,
   ) {
     use super::bbs_post::calc_size;
     use crate::helpers::iterators::IteratorHelper;
@@ -788,7 +816,6 @@ impl Net {
 
     let mut packet_orchestrator = self.packet_orchestrator.borrow_mut();
 
-    let start_depth = client.widget_tracker.get_board_count() as u8;
     client.widget_tracker.track_board(self.active_plugin);
 
     if posts.is_empty() {
@@ -798,10 +825,10 @@ impl Net {
         client.socket_address,
         Reliability::ReliableOrdered,
         ServerPacket::OpenBoard {
-          current_depth: start_depth,
           name,
           color,
           posts: &[],
+          open_instantly,
         },
       );
     }
@@ -818,8 +845,9 @@ impl Net {
       if borrowed_state.0 == 0 {
         packet_size += 2 + name.len();
         packet_size += 3; // color
+        packet_size += 1; // openInstantly
       } else {
-        packet_size += 2; // currentDepth + hasReference
+        packet_size += 1; // hasReference
 
         if let Some(last_id) = borrowed_state.1.as_ref() {
           packet_size += 2 + last_id.len(); // reference
@@ -841,7 +869,6 @@ impl Net {
       .pack_chunks_lossy(calc_chunk_limit, calc_post_size);
 
     let mut last_id = None;
-    let current_depth = client.widget_tracker.get_board_count() as u8;
 
     use crate::packets::build_packet;
 
@@ -853,14 +880,13 @@ impl Net {
 
       let packet = if i == 0 {
         ServerPacket::OpenBoard {
-          current_depth: start_depth,
           name,
           color,
           posts: chunk.as_slice(),
+          open_instantly,
         }
       } else {
         ServerPacket::AppendPosts {
-          current_depth,
           reference: ref_id.as_deref(),
           posts: chunk.as_slice(),
         }
@@ -896,7 +922,7 @@ impl Net {
     let calc_chunk_limit = |_| {
       // reliability + id + type
       let mut packet_size = 1 + 8 + 2;
-      packet_size += 2; // currentDepth + hasReference
+      packet_size += 1; // hasReference
 
       if let Some(last_id) = last_id.borrow().as_ref() {
         packet_size += 2 + last_id.len(); // reference
@@ -915,7 +941,6 @@ impl Net {
       .pack_chunks_lossy(calc_chunk_limit, calc_post_size);
 
     let mut last_id = reference;
-    let current_depth = client.widget_tracker.get_board_count() as u8;
 
     use crate::packets::build_packet;
 
@@ -927,13 +952,11 @@ impl Net {
 
       let packet = if i == 0 {
         ServerPacket::PrependPosts {
-          current_depth,
           reference: ref_id.as_deref(),
           posts: chunk.as_slice(),
         }
       } else {
         ServerPacket::AppendPosts {
-          current_depth,
           reference: ref_id.as_deref(),
           posts: chunk.as_slice(),
         }
@@ -969,7 +992,7 @@ impl Net {
     let calc_chunk_limit = |_| {
       // reliability + id + type
       let mut packet_size = 1 + 8 + 2;
-      packet_size += 2; // currentDepth + hasReference
+      packet_size += 2; // hasReference
 
       if let Some(last_id) = last_id.borrow().as_ref() {
         packet_size += 2 + last_id.len(); // reference
@@ -988,7 +1011,6 @@ impl Net {
       .pack_chunks_lossy(calc_chunk_limit, calc_post_size);
 
     let mut last_id = reference;
-    let current_depth = client.widget_tracker.get_board_count() as u8;
 
     use crate::packets::build_packet;
 
@@ -999,7 +1021,6 @@ impl Net {
       std::mem::swap(&mut ref_id, &mut last_id); // avoiding clone
 
       let packet = ServerPacket::AppendPosts {
-        current_depth,
         reference: ref_id.as_deref(),
         posts: chunk.as_slice(),
       };
@@ -1021,10 +1042,7 @@ impl Net {
       self.packet_orchestrator.borrow_mut().send(
         client.socket_address,
         Reliability::ReliableOrdered,
-        ServerPacket::RemovePost {
-          current_depth: client.widget_tracker.get_board_count() as u8,
-          id: post_id,
-        },
+        ServerPacket::RemovePost { id: post_id },
       );
     }
   }
@@ -1159,20 +1177,41 @@ impl Net {
     );
   }
 
-  pub fn set_mod_whitelist_for_player(&mut self, player_id: &str, whitelist_path: &str) {
-    ensure_asset(
-      &mut *self.packet_orchestrator.borrow_mut(),
-      self.config.max_payload_size,
-      &self.asset_manager,
-      &mut self.clients,
-      &[String::from(player_id)],
-      &whitelist_path.to_string(),
-    );
+  pub fn set_mod_whitelist_for_player(&mut self, player_id: &str, whitelist_path: Option<&str>) {
+    if let Some(whitelist_path) = whitelist_path {
+      ensure_asset(
+        &mut *self.packet_orchestrator.borrow_mut(),
+        self.config.max_payload_size,
+        &self.asset_manager,
+        &mut self.clients,
+        &[String::from(player_id)],
+        &whitelist_path.to_string(),
+      );
+    };
 
     self.packet_orchestrator.borrow_mut().send_by_id(
       player_id,
       Reliability::ReliableOrdered,
       ServerPacket::ModWhitelist { whitelist_path },
+    );
+  }
+
+  pub fn set_mod_blacklist_for_player(&mut self, player_id: &str, blacklist_path: Option<&str>) {
+    if let Some(blacklist_path) = blacklist_path {
+      ensure_asset(
+        &mut *self.packet_orchestrator.borrow_mut(),
+        self.config.max_payload_size,
+        &self.asset_manager,
+        &mut self.clients,
+        &[String::from(player_id)],
+        &blacklist_path.to_string(),
+      );
+    }
+
+    self.packet_orchestrator.borrow_mut().send_by_id(
+      player_id,
+      Reliability::ReliableOrdered,
+      ServerPacket::ModBlacklist { blacklist_path },
     );
   }
 
@@ -1682,14 +1721,17 @@ impl Net {
 
     let player_assets = [
       (texture_path.clone(), AssetData::Texture(texture_data)),
-      (animation_path.clone(), AssetData::Text(animation_data)),
+      (
+        animation_path.clone(),
+        AssetData::compress_text(animation_data),
+      ),
       (
         mugshot_texture_path,
         AssetData::Texture(mugshot_texture_data),
       ),
       (
         mugshot_animation_path,
-        AssetData::Text(mugshot_animation_data),
+        AssetData::compress_text(mugshot_animation_data),
       ),
     ];
 
@@ -2221,11 +2263,35 @@ impl Net {
     }
   }
 
+  pub fn request_update_synchronization(&mut self) {
+    self
+      .packet_orchestrator
+      .borrow_mut()
+      .request_update_synchronization();
+  }
+
+  pub fn request_disable_update_synchronization(&mut self) {
+    self
+      .packet_orchestrator
+      .borrow_mut()
+      .request_disable_update_synchronization();
+  }
+
   pub fn message_server(&mut self, address: String, port: u16, data: Vec<u8>) {
     use crate::jobs::message_server::message_server;
 
     if let Ok(socket) = self.socket.try_clone() {
       message_server(socket, address, port, data);
+    }
+  }
+
+  pub fn send_terminal_response(&mut self, player_id: &str, result_string: &str) {
+    if let Some(client) = self.clients.get_mut(player_id) {
+      self.packet_orchestrator.borrow_mut().send(
+        client.socket_address,
+        Reliability::Reliable,
+        ServerPacket::TerminalResponse { result_string },
+      );
     }
   }
 

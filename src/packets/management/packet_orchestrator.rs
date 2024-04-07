@@ -1,15 +1,18 @@
 use crate::packets::{PacketShipper, Reliability, ServerPacket};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{RefCell, RefMut};
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 pub struct PacketOrchestrator {
   socket: Rc<std::net::UdpSocket>,
   resend_budget: usize,
+  client_id_map: HashMap<String, Rc<RefCell<PacketShipper>>>,
   client_room_map: HashMap<std::net::SocketAddr, Vec<String>>,
   shipper_map: HashMap<std::net::SocketAddr, Rc<RefCell<PacketShipper>>>,
   rooms: HashMap<String, Vec<Rc<RefCell<PacketShipper>>>>,
-  client_id_map: HashMap<String, Rc<RefCell<PacketShipper>>>,
+  synchronize_updates: bool,
+  synchronize_requests: usize,
+  synchronize_locked_clients: HashSet<std::net::SocketAddr>,
 }
 
 impl PacketOrchestrator {
@@ -17,11 +20,47 @@ impl PacketOrchestrator {
     PacketOrchestrator {
       socket,
       resend_budget,
+      client_id_map: HashMap::new(),
       client_room_map: HashMap::new(),
       shipper_map: HashMap::new(),
       rooms: HashMap::new(),
-      client_id_map: HashMap::new(),
+      synchronize_updates: false,
+      synchronize_requests: 0,
+      synchronize_locked_clients: HashSet::new(),
     }
+  }
+
+  pub fn request_update_synchronization(&mut self) {
+    self.synchronize_updates = true;
+    self.synchronize_requests += 1;
+  }
+
+  pub fn request_disable_update_synchronization(&mut self) {
+    if self.synchronize_requests == 0 {
+      println!("disable_update_synchronization called too many times!");
+      return;
+    }
+
+    self.synchronize_requests -= 1;
+
+    if self.synchronize_requests > 0 {
+      return;
+    }
+
+    use crate::packets::build_packet;
+
+    let bytes = build_packet(ServerPacket::EndSynchronization);
+
+    for socket_address in &self.synchronize_locked_clients {
+      if let Some(shipper) = self.shipper_map.get_mut(socket_address) {
+        shipper
+          .borrow_mut()
+          .send_bytes(&self.socket, Reliability::ReliableOrdered, &bytes);
+      }
+    }
+
+    self.synchronize_locked_clients.clear();
+    self.synchronize_updates = false;
   }
 
   pub fn add_client(&mut self, socket_address: std::net::SocketAddr, id: String) {
@@ -117,7 +156,14 @@ impl PacketOrchestrator {
     packet: ServerPacket,
   ) {
     if let Some(shipper) = self.shipper_map.get_mut(&socket_address) {
-      shipper.borrow_mut().send(&self.socket, reliability, packet)
+      internal_send_packet(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packet,
+      )
     }
   }
 
@@ -128,11 +174,14 @@ impl PacketOrchestrator {
     packets: Vec<ServerPacket>,
   ) {
     if let Some(shipper) = self.shipper_map.get_mut(&socket_address) {
-      let mut shipper = shipper.borrow_mut();
-
-      for packet in packets {
-        shipper.send(&self.socket, reliability, packet)
-      }
+      internal_send_packets(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packets,
+      );
     }
   }
 
@@ -143,17 +192,27 @@ impl PacketOrchestrator {
     packets: &[Vec<u8>],
   ) {
     if let Some(shipper) = self.shipper_map.get_mut(&socket_address) {
-      let mut shipper = shipper.borrow_mut();
-
-      for bytes in packets {
-        shipper.send_bytes(&self.socket, reliability, bytes)
-      }
+      internal_send_byte_packets(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packets,
+      );
     }
   }
 
   pub fn send_by_id(&mut self, id: &str, reliability: Reliability, packet: ServerPacket) {
     if let Some(shipper) = self.client_id_map.get_mut(id) {
-      shipper.borrow_mut().send(&self.socket, reliability, packet)
+      internal_send_packet(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packet,
+      );
     }
   }
 
@@ -165,11 +224,14 @@ impl PacketOrchestrator {
     packets: Vec<ServerPacket>,
   ) {
     if let Some(shipper) = self.client_id_map.get_mut(id) {
-      let mut shipper = shipper.borrow_mut();
-
-      for packet in packets {
-        shipper.send(&self.socket, reliability, packet)
-      }
+      internal_send_packets(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packets,
+      );
     }
   }
 
@@ -180,11 +242,14 @@ impl PacketOrchestrator {
     packets: &[Vec<u8>],
   ) {
     if let Some(shipper) = self.client_id_map.get_mut(id) {
-      let mut shipper = shipper.borrow_mut();
-
-      for bytes in packets {
-        shipper.send_bytes(&self.socket, reliability, bytes)
-      }
+      internal_send_byte_packets(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packets,
+      );
     }
   }
 
@@ -205,9 +270,14 @@ impl PacketOrchestrator {
     let bytes = build_packet(packet);
 
     for shipper in room {
-      shipper
-        .borrow_mut()
-        .send_bytes(&self.socket, reliability, &bytes)
+      internal_send_bytes(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        &bytes,
+      );
     }
   }
 
@@ -224,9 +294,14 @@ impl PacketOrchestrator {
     };
 
     for shipper in room {
-      shipper
-        .borrow_mut()
-        .send_bytes(&self.socket, reliability, &bytes)
+      internal_send_bytes(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        &bytes,
+      );
     }
   }
 
@@ -257,11 +332,14 @@ impl PacketOrchestrator {
     };
 
     for shipper in room {
-      let mut shipper = shipper.borrow_mut();
-
-      for bytes in packets {
-        shipper.send_bytes(&self.socket, reliability, bytes)
-      }
+      internal_send_byte_packets(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        packets,
+      );
     }
   }
 
@@ -271,9 +349,14 @@ impl PacketOrchestrator {
     let bytes = build_packet(packet);
 
     for shipper in self.shipper_map.values_mut() {
-      shipper
-        .borrow_mut()
-        .send_bytes(&self.socket, reliability, &bytes);
+      internal_send_bytes(
+        self.synchronize_updates,
+        &mut self.synchronize_locked_clients,
+        &self.socket,
+        shipper,
+        reliability,
+        &bytes,
+      );
     }
   }
 
@@ -292,6 +375,118 @@ impl PacketOrchestrator {
     for shipper in self.shipper_map.values_mut() {
       shipper.borrow_mut().resend_backed_up_packets(&self.socket);
     }
+  }
+}
+
+// funneling sending packets to these internal functions to handle synchronized updates
+fn handle_synchronization(
+  synchronize_updates: bool,
+  synchronize_locked_clients: &mut HashSet<std::net::SocketAddr>,
+  socket: &std::net::UdpSocket,
+  shipper: &mut RefMut<PacketShipper>,
+  reliability: Reliability,
+) -> Reliability {
+  if !synchronize_updates || synchronize_locked_clients.contains(&shipper.get_destination()) {
+    return reliability;
+  }
+
+  synchronize_locked_clients.insert(shipper.get_destination());
+
+  shipper.send(
+    socket,
+    Reliability::ReliableOrdered,
+    ServerPacket::SynchronizeUpdates,
+  );
+
+  // force reliable ordered for synchronization
+  Reliability::ReliableOrdered
+}
+
+fn internal_send_packet(
+  synchronize_updates: bool,
+  synchronize_locked_clients: &mut HashSet<std::net::SocketAddr>,
+  socket: &std::net::UdpSocket,
+  shipper: &RefCell<PacketShipper>,
+  reliability: Reliability,
+  packet: ServerPacket,
+) {
+  let mut shipper = shipper.borrow_mut();
+
+  let reliability = handle_synchronization(
+    synchronize_updates,
+    synchronize_locked_clients,
+    socket,
+    &mut shipper,
+    reliability,
+  );
+
+  shipper.send(socket, reliability, packet);
+}
+
+fn internal_send_bytes(
+  synchronize_updates: bool,
+  synchronize_locked_clients: &mut HashSet<std::net::SocketAddr>,
+  socket: &std::net::UdpSocket,
+  shipper: &RefCell<PacketShipper>,
+  reliability: Reliability,
+  bytes: &[u8],
+) {
+  let mut shipper = shipper.borrow_mut();
+
+  let reliability = handle_synchronization(
+    synchronize_updates,
+    synchronize_locked_clients,
+    socket,
+    &mut shipper,
+    reliability,
+  );
+
+  shipper.send_bytes(socket, reliability, bytes);
+}
+
+fn internal_send_packets(
+  synchronize_updates: bool,
+  synchronize_locked_clients: &mut HashSet<std::net::SocketAddr>,
+  socket: &std::net::UdpSocket,
+  shipper: &RefCell<PacketShipper>,
+  reliability: Reliability,
+  packets: Vec<ServerPacket>,
+) {
+  let mut shipper = shipper.borrow_mut();
+
+  let reliability = handle_synchronization(
+    synchronize_updates,
+    synchronize_locked_clients,
+    socket,
+    &mut shipper,
+    reliability,
+  );
+
+  for packet in packets {
+    shipper.send(socket, reliability, packet);
+  }
+}
+
+fn internal_send_byte_packets(
+  synchronize_updates: bool,
+  synchronize_locked_clients: &mut HashSet<std::net::SocketAddr>,
+  socket: &std::net::UdpSocket,
+  shipper: &RefCell<PacketShipper>,
+  reliability: Reliability,
+  packets: &[Vec<u8>],
+) {
+  let mut shipper = shipper.borrow_mut();
+
+  let reliability = handle_synchronization(
+    synchronize_updates,
+    synchronize_locked_clients,
+    socket,
+    &mut shipper,
+    reliability,
+  );
+
+  for bytes in packets {
+    shipper.send_bytes(socket, reliability, bytes);
   }
 }
 

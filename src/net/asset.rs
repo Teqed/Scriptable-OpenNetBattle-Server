@@ -13,9 +13,30 @@ pub struct Asset {
 #[derive(Clone, Debug)]
 pub enum AssetData {
   Text(String),
+  CompressedText(Vec<u8>),
   Texture(Vec<u8>),
   Audio(Vec<u8>),
   Data(Vec<u8>),
+}
+
+impl AssetData {
+  pub fn compress_text(text: String) -> AssetData {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::prelude::*;
+
+    let mut e = ZlibEncoder::new(Vec::new(), Compression::fast());
+
+    if e.write_all(text.as_bytes()).is_err() {
+      return AssetData::Text(text);
+    }
+
+    if let Ok(bytes) = e.finish() {
+      return AssetData::CompressedText(bytes);
+    }
+
+    AssetData::Text(text)
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -62,6 +83,10 @@ impl Asset {
 
     asset.resolve_dependencies(path);
 
+    if let AssetData::Text(text) = asset.data {
+      asset.data = AssetData::compress_text(text)
+    }
+
     asset
   }
 
@@ -93,20 +118,25 @@ impl Asset {
 
     asset.resolve_dependencies(path);
 
+    if let AssetData::Text(text) = asset.data {
+      asset.data = AssetData::compress_text(text)
+    }
+
     asset
   }
 
   pub fn len(&self) -> usize {
     match &self.data {
       AssetData::Text(data) => data.len(),
+      AssetData::CompressedText(data) => data.len(),
       AssetData::Texture(data) => data.len(),
       AssetData::Audio(data) => data.len(),
       AssetData::Data(data) => data.len(),
     }
   }
 
-  /// Resolves dependencies and alternate name. `load_from_*` functions automatically call this
-  pub fn resolve_dependencies(&mut self, path: &std::path::Path) {
+  // Resolves dependencies and alternate name. `load_from_*` functions automatically call this
+  fn resolve_dependencies(&mut self, path: &std::path::Path) {
     let extension = path
       .extension()
       .unwrap_or_default()

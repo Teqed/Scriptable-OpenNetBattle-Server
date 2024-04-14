@@ -29,13 +29,12 @@ Net:on("actor_interaction", function(event)
 
   Net.lock_player_input(player_id)
 
-  local player_pos = Net.get_player_position(player_id)
+  Net.set_bot_direction(bot_id, Direction.from_points(bot_pos, Net.get_player_position(player_id)))
 
-  Net.set_bot_direction(bot_id, Direction.from_points(bot_pos, player_pos))
-
-  Net.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path);
-  Net.unlock_player_input(player_id)
-  Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
+  Async.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path).and_then(function()
+    Net.unlock_player_input(player_id)
+    Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
+  end)
 
   -- Async.question_player(player_id, "HELLO! ARE YOU DOING WELL TODAY?", mug_texture_path, mug_animation_path)
   --   .and_then(function(response)

@@ -319,4 +319,9 @@ pub fn inject_dynamic(lua_api: &mut LuaApi) {
 
     lua_ctx.pack_multi(())
   });
+
+  lua_api.add_dynamic_function("Net", "get_system_temperature", |api_ctx, lua_ctx, _params| {
+    let net = api_ctx.net_ref.borrow();
+    lua_ctx.pack_multi(net.get_system_temperature())
+  });
 }

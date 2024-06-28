@@ -31,7 +31,14 @@ Net:on("actor_interaction", function(event)
 
   Net.set_bot_direction(bot_id, Direction.from_points(bot_pos, Net.get_player_position(player_id)))
 
-  Async.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path).and_then(function()
+  -- Async.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE!", mug_texture_path, mug_animation_path).and_then(function()
+  --   Net.unlock_player_input(player_id)
+  --   Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
+  -- end)
+
+  local temperature = Net.get_system_temperature()
+
+  Async.message_player(player_id, "HELLO! THE CPU TEMPERATURE IS " .. temperature .. " CELSIUS!", mug_texture_path, mug_animation_path).and_then(function()
     Net.unlock_player_input(player_id)
     Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)
   end)

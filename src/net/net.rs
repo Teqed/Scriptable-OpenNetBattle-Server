@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::rc::Rc;
+use systemstat::{System, Platform};
 
 pub struct Net {
   socket: Rc<UdpSocket>,
@@ -2306,6 +2307,10 @@ impl Net {
         );
       }
     }
+  }
+
+  pub fn get_system_temperature(&self) -> f32 {
+    System::new().cpu_temp().unwrap_or(0.0)
   }
 }
 

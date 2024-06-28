@@ -33,11 +33,14 @@ Net:on("actor_interaction", function(event)
 
   local temperature = Net.get_system_temperature()
   temperature = string.format("%.2f", temperature)
+  local system_load = Net.get_system_load()
+  system_load = string.format("%.2f", system_load)
 
   Async.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE! \
+       \
       THE CPU TEMPERATURE IS " .. temperature .. " CELSIUS! \
-      THE SYSTEM LOAD IS " .. Net.get_system_load() .. "! \
-      ", mug_texture_path, mug_animation_path).and_then(function()
+       \
+      THE SYSTEM LOAD IS " .. system_load .. "%!", mug_texture_path, mug_animation_path).and_then(function()
     Async.message_player(player_id, "", mug_texture_path, mug_animation_path).and_then(function()
       Net.unlock_player_input(player_id)
       Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)

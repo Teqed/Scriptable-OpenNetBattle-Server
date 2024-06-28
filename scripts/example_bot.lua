@@ -39,7 +39,6 @@ Net:on("actor_interaction", function(event)
   Async.message_player(player_id, "HELLO! WELCOME TO TEQ'S WEBPAGE! \
 \
 THE CPU TEMPERATURE IS " .. temperature .. " CELSIUS! \
-\
 THE SYSTEM LOAD IS " .. system_load .. "%!", mug_texture_path, mug_animation_path).and_then(function()
     Net.unlock_player_input(player_id)
     Net.set_bot_direction(bot_id, Direction.DOWN_LEFT)

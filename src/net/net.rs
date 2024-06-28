@@ -2312,6 +2312,10 @@ impl Net {
   pub fn get_system_temperature(&self) -> f32 {
     System::new().cpu_temp().unwrap_or(0.0)
   }
+
+  pub fn get_system_load(&self) -> f32 {
+    System::new().load_average().unwrap().one
+  }
 }
 
 fn broadcast_actor_keyframes(
